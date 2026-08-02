@@ -1,0 +1,19 @@
+{
+  "name": "Wocchi Desk",
+  "short_name": "Wocchi",
+  "description": "予定とタスクを、今日やることに整える個人用秘書ツール",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f8fb",
+  "theme_color": "#102a43",
+  "icons": [
+    {
+      "src": "icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -6,10 +6,16 @@ const DAY_END = 20 * 60;
 const PRIORITY_WEIGHT = { high: 3, medium: 2, low: 1 };
 const PRIORITY_LABEL = { high: "高", medium: "中", low: "低" };
 
-const state = { events: [], tasks: [], selectedDate: toDateKey(new Date()) };
+const state = { events: [], tasks: [], selectedDate: toDateKey(new Date()), updatedAt: null };
 const elements = {};
+let deferredInstallPrompt = null;
 
 document.addEventListener("DOMContentLoaded", initialize);
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  document.getElementById("install-app")?.classList.remove("is-hidden");
+});
 
 function initialize() {
   cacheElements();
@@ -17,6 +23,8 @@ function initialize() {
   bindEvents();
   elements.selectedDate.value = state.selectedDate;
   render();
+  registerServiceWorker();
+  initializeCloud();
 }
 
 function cacheElements() {
@@ -25,7 +33,8 @@ function cacheElements() {
     "free-time-list", "task-count", "task-list", "event-dialog", "event-form", "event-dialog-title",
     "event-id", "event-title", "event-date", "event-start", "event-end", "event-notes", "event-error",
     "task-dialog", "task-form", "task-dialog-title", "task-id", "task-title", "task-date", "task-priority",
-    "task-duration", "task-notes", "task-error", "toast"].forEach((id) => {
+    "task-duration", "task-notes", "task-error", "settings-dialog", "install-help", "import-file",
+    "cloud-status", "cloud-login-form", "cloud-email", "cloud-session-actions", "cloud-message", "toast"].forEach((id) => {
     elements[toCamel(id)] = document.getElementById(id);
   });
 }
@@ -49,6 +58,17 @@ function bindEvents() {
   elements.eventList.addEventListener("click", handleEventAction);
   elements.taskList.addEventListener("click", handleTaskAction);
   elements.taskList.addEventListener("change", handleTaskToggle);
+  document.getElementById("open-settings").addEventListener("click", () => elements.settingsDialog.showModal());
+  document.getElementById("install-app").addEventListener("click", handleInstall);
+  document.getElementById("install-app-settings").addEventListener("click", handleInstall);
+  document.getElementById("export-data").addEventListener("click", exportData);
+  document.getElementById("import-data").addEventListener("click", () => elements.importFile.click());
+  elements.importFile.addEventListener("change", importData);
+  elements.cloudLoginForm.addEventListener("submit", handleCloudLogin);
+  document.getElementById("sync-now").addEventListener("click", () => syncCloud(true));
+  document.getElementById("cloud-sign-out").addEventListener("click", handleCloudSignOut);
+  window.addEventListener("online", () => { updateConnectionCopy(); syncCloud(false); });
+  window.addEventListener("offline", updateConnectionCopy);
 }
 
 function loadState() {
@@ -57,6 +77,7 @@ function loadState() {
     if (saved && Array.isArray(saved.events) && Array.isArray(saved.tasks)) {
       state.events = saved.events.filter(isValidStoredEvent);
       state.tasks = saved.tasks.filter(isValidStoredTask);
+      state.updatedAt = typeof saved.updatedAt === "string" ? saved.updatedAt : null;
     }
   } catch (error) {
     console.warn("保存データを読み込めなかったため、空の状態で開始します。", error);
@@ -64,13 +85,29 @@ function loadState() {
 }
 
 function saveState(message) {
+  state.updatedAt = new Date().toISOString();
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ events: state.events, tasks: state.tasks }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getSerializableState()));
     showToast(message);
+    scheduleCloudSync();
   } catch (error) {
     console.warn("データを保存できませんでした。", error);
     showToast("ブラウザに保存できませんでした");
   }
+}
+
+function getSerializableState() {
+  return { version: 1, events: state.events, tasks: state.tasks, updatedAt: state.updatedAt };
+}
+
+function replaceLocalData(data, message) {
+  if (!data || !Array.isArray(data.events) || !Array.isArray(data.tasks)) throw new Error("対応していないデータ形式です。");
+  state.events = data.events.filter(isValidStoredEvent);
+  state.tasks = data.tasks.filter(isValidStoredTask);
+  state.updatedAt = typeof data.updatedAt === "string" ? data.updatedAt : new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(getSerializableState()));
+  render();
+  showToast(message);
 }
 
 function isValidStoredEvent(item) {
@@ -322,6 +359,127 @@ function handleTaskToggle(event) {
   const item = state.tasks.find((entry) => entry.id === event.target.dataset.id); if (!item) return;
   item.completed = event.target.checked; item.completedAt = item.completed ? new Date().toISOString() : null;
   saveState(item.completed ? "タスクを完了しました" : "未完了に戻しました"); render();
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("./sw.js").catch((error) => console.warn("オフライン機能を開始できませんでした。", error));
+}
+
+async function handleInstall() {
+  if (window.matchMedia("(display-mode: standalone)").matches) return showToast("すでにアプリとして起動しています");
+  if (deferredInstallPrompt) {
+    await deferredInstallPrompt.prompt();
+    const result = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    document.getElementById("install-app").classList.add("is-hidden");
+    return showToast(result.outcome === "accepted" ? "インストールを開始しました" : "インストールをキャンセルしました");
+  }
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const message = isIOS
+    ? "Safariの共有ボタンから「ホーム画面に追加」→「Webアプリとして開く」を選んでください。"
+    : "ブラウザのメニューから「アプリをインストール」または「ホーム画面に追加」を選んでください。";
+  elements.installHelp.textContent = message;
+  showToast(message);
+}
+
+function exportData() {
+  const payload = { app: "Wocchi Desk", exportedAt: new Date().toISOString(), ...getSerializableState() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = `wocchi-desk-${toDateKey(new Date())}.json`;
+  document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  showToast("バックアップを書き出しました");
+}
+
+async function importData(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) return showToast("ファイルが大きすぎます");
+  try {
+    const data = JSON.parse(await file.text());
+    if (!window.confirm("現在の予定とタスクを、バックアップの内容で置き換えますか？")) return;
+    data.updatedAt = new Date().toISOString();
+    replaceLocalData(data, "バックアップを読み込みました");
+    scheduleCloudSync();
+  } catch (error) {
+    console.warn("バックアップを読み込めませんでした。", error);
+    showToast("正しいバックアップファイルを選んでください");
+  }
+}
+
+async function initializeCloud() {
+  updateConnectionCopy();
+  if (!window.WocchiCloud?.isConfigured()) {
+    elements.cloudLoginForm.classList.add("is-hidden");
+    elements.cloudStatus.textContent = "クラウドは未設定です。現在はこの端末だけに保存されています。";
+    return;
+  }
+  try {
+    const user = await window.WocchiCloud.getUser();
+    updateCloudSession(user);
+    if (user) await syncCloud(false);
+  } catch (error) {
+    elements.cloudMessage.textContent = error.message;
+  }
+}
+
+function updateCloudSession(user) {
+  elements.cloudLoginForm.classList.toggle("is-hidden", Boolean(user));
+  elements.cloudSessionActions.classList.toggle("is-hidden", !user);
+  elements.cloudStatus.textContent = user ? `${user.email || "ログイン済み"} と同期します。` : "ログインするとスマホとPCで同じデータを利用できます。";
+}
+
+function updateConnectionCopy() {
+  document.documentElement.dataset.connection = navigator.onLine ? "online" : "offline";
+  if (!navigator.onLine && elements.cloudStatus) elements.cloudStatus.textContent = "オフラインです。変更は端末に保存され、接続後に同期できます。";
+}
+
+async function handleCloudLogin(event) {
+  event.preventDefault();
+  const email = elements.cloudEmail.value.trim();
+  elements.cloudMessage.textContent = "";
+  try {
+    await window.WocchiCloud.sendMagicLink(email);
+    elements.cloudMessage.textContent = "ログイン用リンクをメールへ送りました。";
+    elements.cloudMessage.style.color = "var(--success)";
+  } catch (error) {
+    elements.cloudMessage.textContent = error.message;
+    elements.cloudMessage.style.color = "var(--danger)";
+  }
+}
+
+async function syncCloud(showResult) {
+  if (!navigator.onLine || !window.WocchiCloud?.isConfigured()) return;
+  try {
+    const result = await window.WocchiCloud.sync(getSerializableState());
+    if (result.direction === "download") replaceLocalData(result.data, "クラウドのデータを反映しました");
+    else {
+      state.updatedAt = result.data.updatedAt;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(getSerializableState()));
+      if (showResult) showToast("クラウドへ同期しました");
+    }
+    updateCloudSession(result.user);
+    elements.cloudMessage.textContent = `最終同期 ${new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" }).format(new Date())}`;
+    elements.cloudMessage.style.color = "var(--success)";
+  } catch (error) {
+    if (showResult) showToast(error.message);
+    elements.cloudMessage.textContent = error.message;
+    elements.cloudMessage.style.color = "var(--danger)";
+  }
+}
+
+function scheduleCloudSync() {
+  clearTimeout(scheduleCloudSync.timer);
+  scheduleCloudSync.timer = setTimeout(() => syncCloud(false), 1200);
+}
+
+async function handleCloudSignOut() {
+  await window.WocchiCloud.signOut();
+  updateCloudSession(null);
+  elements.cloudMessage.textContent = "ログアウトしました。端末内のデータは残っています。";
 }
 
 function createElement(tag, className = "", text = null) {

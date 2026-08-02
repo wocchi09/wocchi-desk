@@ -4,7 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#102a43">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Wocchi Desk</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/app-icon.svg">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,7 +20,11 @@
         <h1>Wocchi Desk</h1>
         <p class="subtitle">予定とタスクを、今日やることに整える。</p>
       </div>
-      <button id="open-event-modal" class="button button-light" type="button">＋ 予定を追加</button>
+      <div class="header-actions">
+        <button id="install-app" class="button button-ghost is-hidden" type="button">アプリをインストール</button>
+        <button id="open-settings" class="button button-ghost" type="button">設定</button>
+        <button id="open-event-modal" class="button button-light" type="button">＋ 予定を追加</button>
+      </div>
     </div>
   </header>
 
@@ -138,7 +147,59 @@
     </form>
   </dialog>
 
+  <dialog id="settings-dialog" aria-labelledby="settings-dialog-title">
+    <div class="modal-form settings-panel">
+      <div class="modal-heading">
+        <div>
+          <h2 id="settings-dialog-title">設定</h2>
+          <p class="muted">端末へのインストール、バックアップ、同期を管理します。</p>
+        </div>
+        <button class="icon-button close-dialog" type="button" aria-label="閉じる">×</button>
+      </div>
+
+      <section class="settings-section">
+        <div>
+          <h3>この端末</h3>
+          <p id="install-help" class="muted">ホーム画面やデスクトップから起動できます。</p>
+        </div>
+        <button id="install-app-settings" class="button button-secondary" type="button">インストール方法</button>
+      </section>
+
+      <section class="settings-section settings-section-stack">
+        <div>
+          <h3>バックアップ</h3>
+          <p class="muted">予定とタスクをJSONファイルに保存・復元します。</p>
+        </div>
+        <div class="settings-actions">
+          <button id="export-data" class="button button-secondary" type="button">書き出す</button>
+          <button id="import-data" class="button button-secondary" type="button">読み込む</button>
+          <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json">
+        </div>
+      </section>
+
+      <section class="settings-section settings-section-stack">
+        <div>
+          <h3>クラウド同期</h3>
+          <p id="cloud-status" class="muted">現在はこの端末だけに保存されています。</p>
+        </div>
+        <form id="cloud-login-form" class="inline-form">
+          <label>メールアドレス
+            <input id="cloud-email" type="email" autocomplete="email" placeholder="you@example.com" required>
+          </label>
+          <button class="button button-primary" type="submit">ログインリンクを送る</button>
+        </form>
+        <div id="cloud-session-actions" class="settings-actions is-hidden">
+          <button id="sync-now" class="button button-primary" type="button">今すぐ同期</button>
+          <button id="cloud-sign-out" class="button button-secondary" type="button">ログアウト</button>
+        </div>
+        <p id="cloud-message" class="form-error" role="status"></p>
+      </section>
+    </div>
+  </dialog>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="config.js" defer></script>
+  <script src="cloud.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

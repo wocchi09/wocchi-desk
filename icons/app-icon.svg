@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Wocchi Desk">
+  <rect width="512" height="512" rx="112" fill="#102a43"/>
+  <path d="M110 146h66l40 190 40-139h57l40 139 40-190h66l-66 244h-70l-38-128-38 128h-70z" fill="#fff"/>
+  <circle cx="405" cy="112" r="38" fill="#7fc4e8"/>
+</svg>
