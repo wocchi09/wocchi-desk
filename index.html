@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#102a43">
+  <title>Wocchi Desk</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div>
+        <p class="eyebrow">PERSONAL SECRETARY</p>
+        <h1>Wocchi Desk</h1>
+        <p class="subtitle">予定とタスクを、今日やることに整える。</p>
+      </div>
+      <button id="open-event-modal" class="button button-light" type="button">＋ 予定を追加</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="date-toolbar card" aria-label="表示日の切り替え">
+      <div class="date-presets" role="group" aria-label="日付プリセット">
+        <button class="date-preset is-active" data-offset="0" type="button">今日</button>
+        <button class="date-preset" data-offset="1" type="button">明日</button>
+      </div>
+      <label class="date-picker-label">指定日
+        <input id="selected-date" type="date">
+      </label>
+      <div class="selected-date-copy">
+        <strong id="selected-date-title"></strong>
+        <span id="selected-date-subtitle"></span>
+      </div>
+    </section>
+
+    <section class="report card" aria-labelledby="report-heading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow dark">SECRETARY REPORT</p>
+          <h2 id="report-heading">秘書レポート</h2>
+        </div>
+        <span id="report-status" class="status-pill"></span>
+      </div>
+      <div id="report-summary" class="report-summary"></div>
+      <div class="report-grid">
+        <article class="report-panel">
+          <h3>最初のおすすめ</h3>
+          <div id="report-recommendation"></div>
+        </article>
+        <article class="report-panel">
+          <h3>次の予定までに</h3>
+          <div id="report-next-action"></div>
+        </article>
+        <article class="report-panel report-panel-wide">
+          <h3>注意点</h3>
+          <ul id="report-alerts" class="plain-list"></ul>
+        </article>
+      </div>
+    </section>
+
+    <div class="workspace-grid">
+      <section class="card" aria-labelledby="schedule-heading">
+        <div class="section-heading compact">
+          <div>
+            <h2 id="schedule-heading">予定</h2>
+            <p id="schedule-count" class="muted"></p>
+          </div>
+          <button id="add-event-inline" class="button button-primary" type="button">＋ 追加</button>
+        </div>
+        <div id="event-list" class="item-list"></div>
+        <div class="subsection">
+          <h3>30分以上の空き時間</h3>
+          <div id="free-time-list" class="chip-list"></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="tasks-heading">
+        <div class="section-heading compact">
+          <div>
+            <h2 id="tasks-heading">優先タスク</h2>
+            <p id="task-count" class="muted"></p>
+          </div>
+          <button id="open-task-modal" class="button button-primary" type="button">＋ 追加</button>
+        </div>
+        <div id="task-list" class="item-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="event-dialog" aria-labelledby="event-dialog-title">
+    <form id="event-form" class="modal-form">
+      <div class="modal-heading">
+        <h2 id="event-dialog-title">予定を追加</h2>
+        <button class="icon-button close-dialog" type="button" aria-label="閉じる">×</button>
+      </div>
+      <input id="event-id" type="hidden">
+      <label>予定名 <input id="event-title" type="text" maxlength="80" required placeholder="例：定例ミーティング"></label>
+      <label>日付 <input id="event-date" type="date" required></label>
+      <div class="field-row">
+        <label>開始 <input id="event-start" type="time" required></label>
+        <label>終了 <input id="event-end" type="time" required></label>
+      </div>
+      <label>メモ <textarea id="event-notes" maxlength="300" rows="3" placeholder="場所や準備事項など"></textarea></label>
+      <p id="event-error" class="form-error" role="alert"></p>
+      <div class="modal-actions">
+        <button class="button button-secondary close-dialog" type="button">キャンセル</button>
+        <button class="button button-primary" type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="task-dialog" aria-labelledby="task-dialog-title">
+    <form id="task-form" class="modal-form">
+      <div class="modal-heading">
+        <h2 id="task-dialog-title">タスクを追加</h2>
+        <button class="icon-button close-dialog" type="button" aria-label="閉じる">×</button>
+      </div>
+      <input id="task-id" type="hidden">
+      <label>タスク名 <input id="task-title" type="text" maxlength="80" required placeholder="例：企画書の下書き"></label>
+      <label>期限 <input id="task-date" type="date" required></label>
+      <div class="field-row">
+        <label>優先度
+          <select id="task-priority">
+            <option value="high">高</option>
+            <option value="medium" selected>中</option>
+            <option value="low">低</option>
+          </select>
+        </label>
+        <label>所要時間（分） <input id="task-duration" type="number" min="5" max="480" step="5" value="30" required></label>
+      </div>
+      <label>メモ <textarea id="task-notes" maxlength="300" rows="3" placeholder="完了条件や補足など"></textarea></label>
+      <p id="task-error" class="form-error" role="alert"></p>
+      <div class="modal-actions">
+        <button class="button button-secondary close-dialog" type="button">キャンセル</button>
+        <button class="button button-primary" type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
